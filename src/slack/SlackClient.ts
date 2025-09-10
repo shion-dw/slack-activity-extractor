@@ -106,8 +106,57 @@ export class SlackClient {
     return messages;
   }
 
+  async getThreadReplies(channelId: string, threadTs: string, oldest: string, latest: string): Promise<SlackMessage[]> {
+    const messages: SlackMessage[] = [];
+    let cursor: string | undefined = undefined;
+    do {
+      try {
+        const resp = await this.client.conversations.replies({
+          channel: channelId,
+          ts: threadTs,
+          cursor,
+          inclusive: true,
+          oldest,
+          latest,
+          limit: 200,
+        });
+        const list = (resp.messages || []).map((m: any) => ({
+          ts: m.ts as string,
+          user: m.user as string | undefined,
+          text: m.text as string | undefined,
+          channel: channelId,
+          thread_ts: (m.thread_ts as string | undefined) || (m.reply_count ? (m.ts as string) : undefined),
+          subtype: m.subtype as string | undefined,
+        }));
+        messages.push(...list);
+        cursor = (resp.response_metadata as any)?.next_cursor || undefined;
+      } catch (e: any) {
+        await this.handleSlackError(e, `スレッド返信の取得に失敗しました (${channelId}/${threadTs})`);
+      }
+    } while (cursor);
+    messages.sort((a, b) => parseFloat(a.ts) - parseFloat(b.ts));
+    return messages;
+  }
+
   async findUserMessages(channelId: string, userId: string, oldest: string, latest: string): Promise<SlackMessage[]> {
-    const all = await this.getChannelHistory(channelId, oldest, latest);
+    const base = await this.getChannelHistory(channelId, oldest, latest);
+    // 既知のスレッドを抽出（root も reply も thread_ts を持つ）
+    const threadRoots = new Set<string>();
+    for (const m of base) {
+      if (m.thread_ts) threadRoots.add(m.thread_ts);
+      // 一部 root は thread_ts を自身の ts として持つ
+      if (!m.thread_ts && (m as any).reply_count) threadRoots.add(m.ts);
+      if (m.thread_ts === m.ts) threadRoots.add(m.ts);
+    }
+    const replies: SlackMessage[] = [];
+    for (const ts of threadRoots) {
+      const rep = await this.getThreadReplies(channelId, ts, oldest, latest);
+      replies.push(...rep);
+    }
+    // マージして重複排除（ts で一意）
+    const byTs = new Map<string, SlackMessage>();
+    for (const m of [...base, ...replies]) byTs.set(m.ts, m);
+    const all = Array.from(byTs.values());
     return all.filter((m) => m.user === userId && !m.subtype);
   }
 

@@ -12,9 +12,14 @@ export class MessageProcessor {
     endDate: Date,
     contextCount: number
   ): Promise<ExtractionResult> {
-    const channelIds: string[] = Array.isArray(channels) && (channels as any[])[0] && typeof (channels as any[])[0] === 'string'
-      ? (channels as string[])
-      : (channels as ChannelInfo[]).map((c) => c.id);
+    const isChannelObjects = Array.isArray(channels) && (channels as any[])[0] && typeof (channels as any[])[0] !== 'string';
+    const channelIds: string[] = isChannelObjects
+      ? (channels as ChannelInfo[]).map((c) => c.id)
+      : (channels as string[]);
+    const nameMap = new Map<string, string>();
+    if (isChannelObjects) {
+      for (const c of channels as ChannelInfo[]) nameMap.set(c.id, c.name);
+    }
 
     const oldest = (startDate.getTime() / 1000).toFixed(6);
     const latest = (endDate.getTime() / 1000).toFixed(6);
@@ -22,22 +27,54 @@ export class MessageProcessor {
     const channelsProcessed: string[] = [];
 
     logger.info('メッセージ抽出を開始:', '対象チャンネル', channelIds.length, '件');
-    for (const channelId of channelIds) {
-      const allMessages = await this.client.getChannelHistory(channelId, oldest, latest);
+    for (let i = 0; i < channelIds.length; i++) {
+      const channelId = channelIds[i];
+      const label = nameMap.get(channelId) || this.client.getCachedChannelName(channelId) || channelId;
+      logger.info(`(${i + 1}/${channelIds.length}) 処理中: #${label}`);
+      // チャンネル履歴 + 該当期間内のスレッド返信を取り込み
+      const base = await this.client.getChannelHistory(channelId, oldest, latest);
+      const threadRoots = new Set<string>();
+      for (const m of base) {
+        if (m.thread_ts) threadRoots.add(m.thread_ts);
+        if (!m.thread_ts && (m as any).reply_count) threadRoots.add(m.ts);
+        if (m.thread_ts === m.ts) threadRoots.add(m.ts);
+      }
+      logger.info('スレッド候補:', threadRoots.size, '件');
+      const replies: SlackMessage[] = [];
+      for (const ts of threadRoots) {
+        const rep = await this.client.getThreadReplies(channelId, ts, oldest, latest);
+        replies.push(...rep);
+      }
+      const map = new Map<string, SlackMessage>();
+      for (const m of [...base, ...replies]) map.set(m.ts, m);
+      const allMessages = Array.from(map.values()).sort((a, b) => parseFloat(a.ts) - parseFloat(b.ts));
+
       const channelUserMessages = allMessages.filter((m) => m.user === userId && !m.subtype);
-      logger.debug('チャンネル処理:', channelId, '総メッセージ', allMessages.length, '対象ユーザー', channelUserMessages.length);
+      logger.info('集計:', '履歴', base.length, 'スレッド', replies.length, '合計', allMessages.length, '対象', channelUserMessages.length);
       if (channelUserMessages.length === 0) continue;
 
       const channelName = this.client.getCachedChannelName(channelId) || channelId;
       channelsProcessed.push(channelName);
 
       for (const um of channelUserMessages) {
-        const idx = allMessages.findIndex((m) => m.ts === um.ts);
-        const startIdx = Math.max(0, idx - contextCount);
-        const endIdx = Math.min(allMessages.length, idx + contextCount + 1);
-        const context: SlackMessage[] = allMessages
-          .slice(startIdx, endIdx)
-          .filter((m) => m.ts !== um.ts);
+        let context: SlackMessage[] = [];
+        // スレッド内のメッセージなら、同一 thread_ts のみから前後N件を抽出
+        if (um.thread_ts) {
+          const rootTs = um.thread_ts;
+          const threadMsgs = allMessages
+            .filter((m) => m.thread_ts === rootTs || m.ts === rootTs)
+            .sort((a, b) => parseFloat(a.ts) - parseFloat(b.ts));
+          const idx = threadMsgs.findIndex((m) => m.ts === um.ts);
+          const startIdx = Math.max(0, idx - contextCount);
+          const endIdx = Math.min(threadMsgs.length, idx + contextCount + 1);
+          context = threadMsgs.slice(startIdx, endIdx).filter((m) => m.ts !== um.ts);
+        } else {
+          // スレッド外はチャンネルタイムラインから前後N件
+          const idx = allMessages.findIndex((m) => m.ts === um.ts);
+          const startIdx = Math.max(0, idx - contextCount);
+          const endIdx = Math.min(allMessages.length, idx + contextCount + 1);
+          context = allMessages.slice(startIdx, endIdx).filter((m) => m.ts !== um.ts);
+        }
         messagesWithContext.push({
           userMessage: um,
           contextMessages: context,
