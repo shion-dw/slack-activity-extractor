@@ -1,0 +1,11 @@
+{
+  "includeChannels": [],
+  "excludeChannels": [],
+  "contextMessageCount": 3,
+  "defaultDays": 180,
+  "outputFormat": "markdown",
+  "outputFileName": "slack-activity-{date}.md",
+  "outputDir": "outputs",
+  "startDate": "",
+  "endDate": ""
+}
