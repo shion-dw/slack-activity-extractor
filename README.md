@@ -44,7 +44,11 @@ yarn build
 実行:
 
 ```
-node dist/cli.js \
+# config.json の設定内容で実行
+yarn start
+
+# CLI オプションで実行（ config.json よりも優先されます）
+yarn start \
   --start-date 2024-01-01 \
   --end-date 2024-01-31 \
   --user-id U1234567890 \
