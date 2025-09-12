@@ -19,10 +19,11 @@ export class OutputGenerator {
   }
 
   buildFileName(pattern: string | undefined, format: 'json' | 'markdown'): string {
-    const date = formatDate(new Date(), 'yyyyMMdd-HHmmss');
-    let fileName = pattern || `slack-activity-${date}.${format === 'json' ? 'json' : 'md'}`;
+    const stamp = formatDate(new Date(), 'yyyyMMdd-HHmmss');
+    let fileName = pattern || `slack-activity-${stamp}.${format === 'json' ? 'json' : 'md'}`;
     if (pattern) {
-      fileName = pattern.replace('{date}', date);
+      // 新形式 {datetime} を優先。後方互換として {date} も置換
+      fileName = pattern.replace('{datetime}', stamp).replace('{date}', stamp);
       if (!/\.md$|\.json$/i.test(fileName)) {
         fileName += format === 'json' ? '.json' : '.md';
       }
@@ -67,15 +68,13 @@ export class OutputGenerator {
 
       lines.push(`## #${item.channelName} - ${toISO(item.userMessage.ts)}`);
       lines.push('');
-      lines.push('```');
       for (const m of pre) {
-        lines.push(`[${toISO(m.ts)}] ${userName(m.user)}: ${showText(m.text, m.subtype)}`);
+        lines.push(`- [${toISO(m.ts)}] ${userName(m.user)}: ${showText(m.text, m.subtype)}`);
       }
-      lines.push(`[${toISO(target.ts)}] ${userName(target.user)}: ${showText(target.text, target.subtype)}  <= TARGET`);
+      lines.push(`- [${toISO(target.ts)}] ${userName(target.user)}: ${showText(target.text, target.subtype)}  <= TARGET`);
       for (const m of post) {
-        lines.push(`[${toISO(m.ts)}] ${userName(m.user)}: ${showText(m.text, m.subtype)}`);
+        lines.push(`- [${toISO(m.ts)}] ${userName(m.user)}: ${showText(m.text, m.subtype)}`);
       }
-      lines.push('```');
       lines.push('');
     }
     return lines.join('\n');

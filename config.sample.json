@@ -4,7 +4,7 @@
   "contextMessageCount": 3,
   "defaultDays": 180,
   "outputFormat": "markdown",
-  "outputFileName": "slack-activity-{date}.md",
+  "outputFileName": "slack-activity-{datetime}.md",
   "outputDir": "outputs",
   "startDate": "",
   "endDate": ""

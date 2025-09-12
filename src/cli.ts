@@ -24,7 +24,7 @@ async function main() {
     .option('-e, --end-date <date>', '終了日 (YYYY-MM-DD)')
     .option('-u, --user-id <userId>', '対象ユーザーID (省略時はトークン所有者)')
     .option('-f, --format <format>', '出力形式: json | markdown')
-    .option('-o, --output <file>', '出力ファイル名 (テンプレート: {date})')
+    .option('-o, --output <file>', '出力ファイル名 (テンプレート: {datetime} / 互換: {date})')
     .option('-c, --config <path>', '設定ファイルパス (config.json)')
     .option('--log-level <level>', 'ログレベル: debug|info|warn|error', 'info')
     .showHelpAfterError();

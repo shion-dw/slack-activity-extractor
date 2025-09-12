@@ -39,3 +39,6 @@
 - `.env` に機密（`SLACK_BOT_TOKEN` 等）を保存し、コミット禁止。共有は行わない。
 - 設定は `config.json` を利用（不要なら削除可）。サンプルを更新したら実体も同期。
 - 必要スコープ例: `channels:history`, `channels:read`, `groups:read`, `users:read`。429（レート制限）考慮済み。
+
+### ファイル名テンプレート
+- `outputFileName` は `{datetime}`（例: `slack-activity-{datetime}.md`）。後方互換で `{date}` も置換されます。

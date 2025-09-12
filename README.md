@@ -53,7 +53,7 @@ yarn start \
   --end-date 2024-01-31 \
   --user-id U1234567890 \
   --format markdown \
-  --output slack-activity-{date}.md
+  --output slack-activity-{datetime}.md
 ```
 
 主なオプション:
@@ -61,7 +61,7 @@ yarn start \
 - `--start-date`, `--end-date`: 省略時は `config.json`（あれば）→なければ「終了日から `defaultDays` 日前 / 現在時刻」の順で補完
 - `--user-id`: 省略時は `.env` の `TARGET_USER_ID` またはトークン所有者
 - `--format`: `json` または `markdown`（config.jsonの `outputFormat` が既定）
-- `--output`: ファイル名テンプレート（`{date}` 置換対応）
+- `--output`: ファイル名テンプレート（`{datetime}` 置換対応。従来の `{date}` も使用可）
 - `--config`: 別の `config.json` を指定
   
 出力先:
